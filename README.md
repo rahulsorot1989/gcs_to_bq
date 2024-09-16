@@ -206,86 +206,93 @@ This code section handles the setup of Google Cloud Storage (GCS) sensors in an 
 
 3. **Task Dependencies**:
    - The `start_<table_name>` task triggers the dynamically created sensors, which in turn trigger the `preprocess_<table_name>` task once the files are detected in GCS.
-
-  # GCS File Dependence Sensor Setup
-
-## Overview
-This code section handles the setup of Google Cloud Storage (GCS) sensors in an Airflow DAG. These sensors check for the existence of specific files in GCS buckets, using a predefined prefix and bucket structure. If the file dependence condition is `True`, a sensor is dynamically created for each bucket and prefix combination.
-
-## Purpose
-- Dynamically create GCS sensors to check for the existence of files in GCS based on the DAG's schedule.
-- Ensure that specific files exist in GCS buckets before triggering downstream tasks in the DAG.
-
-## Parameters
-- **parameter['file_dependance']**: A boolean flag that indicates whether file dependence is required for the DAG.
-- **parameter['sensor_bucket']**: A list of GCS bucket names, where each bucket is formatted using the environment variable `AIRFLOW_VAR_ENV`.
-- **parameter['sensor_file_prefix']**: A list of file prefixes to be used by the GCS sensors when searching for files.
-- **parameter['sensor_timeout']**: A list of timeouts for the GCS sensors, determining how long they will wait for the specified file to appear.
-- **table_name_full**: The full name of the table, used to create task IDs dynamically.
-- **schedule_dts**: The schedule timestamp used to construct the file prefix for the GCS sensor.
-
-### Internal Variables:
-- **IMPERSONATION_CHAIN**: The service account used to impersonate credentials for accessing GCS. Derived from the Airflow environment variable `AIRFLOW_VAR_WORK_PROJECT`.
-
-## Returns
-- **GCSObjectsWithPrefixExistenceSensor**: A dynamically created GCS sensor for each file prefix and bucket combination.
-- **Task ID (tid)**: The task ID is dynamically generated and truncated if necessary to comply with the character limit (max 175 characters for `tid` + `dag_id`).
-
-## Authentication
-- **Impersonated Credentials**: The function uses the `IMPERSONATION_CHAIN` to authenticate and access GCS resources.
-- **Google Cloud Storage**: The sensor uses the default Google Cloud connection ID (`google_cloud_default`) to interact with GCS.
-
-## Functionality
-
-1. **Check for File Dependence**:
-   - The function first checks if `parameter['file_dependance']` is set to `True`. If so, it proceeds to create GCS sensors for the specified buckets and prefixes.
-
-2. **Dynamically Create Sensors**:
-   - For each bucket and file prefix combination, a new `GCSObjectsWithPrefixExistenceSensor` is created. The bucket name is formatted using the environment variable `AIRFLOW_VAR_ENV`, and the file prefix is combined with the schedule timestamp (`schedule_dts`).
-   - A task ID (`tid`) is generated dynamically. If the length of the `tid` combined with the `dag_id` exceeds 175 characters, the task ID is truncated and shortened to ensure it complies with Airflow's character limit.
-
-3. **Task Dependencies**:
-   - The `start_<table_name>` task triggers the dynamically created sensors, which in turn trigger the `preprocess_<table_name>` task once the files are detected in GCS.
-
-  # GCS File Dependence Sensor Setup
-
-## Overview
-This code section handles the setup of Google Cloud Storage (GCS) sensors in an Airflow DAG. These sensors check for the existence of specific files in GCS buckets, using a predefined prefix and bucket structure. If the file dependence condition is `True`, a sensor is dynamically created for each bucket and prefix combination.
-
-## Purpose
-- Dynamically create GCS sensors to check for the existence of files in GCS based on the DAG's schedule.
-- Ensure that specific files exist in GCS buckets before triggering downstream tasks in the DAG.
-
-## Parameters
-- **parameter['file_dependance']**: A boolean flag that indicates whether file dependence is required for the DAG.
-- **parameter['sensor_bucket']**: A list of GCS bucket names, where each bucket is formatted using the environment variable `AIRFLOW_VAR_ENV`.
-- **parameter['sensor_file_prefix']**: A list of file prefixes to be used by the GCS sensors when searching for files.
-- **parameter['sensor_timeout']**: A list of timeouts for the GCS sensors, determining how long they will wait for the specified file to appear.
-- **table_name_full**: The full name of the table, used to create task IDs dynamically.
-- **schedule_dts**: The schedule timestamp used to construct the file prefix for the GCS sensor.
-
-### Internal Variables:
-- **IMPERSONATION_CHAIN**: The service account used to impersonate credentials for accessing GCS. Derived from the Airflow environment variable `AIRFLOW_VAR_WORK_PROJECT`.
-
-## Returns
-- **GCSObjectsWithPrefixExistenceSensor**: A dynamically created GCS sensor for each file prefix and bucket combination.
-- **Task ID (tid)**: The task ID is dynamically generated and truncated if necessary to comply with the character limit (max 175 characters for `tid` + `dag_id`).
-
-## Authentication
-- **Impersonated Credentials**: The function uses the `IMPERSONATION_CHAIN` to authenticate and access GCS resources.
-- **Google Cloud Storage**: The sensor uses the default Google Cloud connection ID (`google_cloud_default`) to interact with GCS.
-
-## Functionality
-
-1. **Check for File Dependence**:
-   - The function first checks if `parameter['file_dependance']` is set to `True`. If so, it proceeds to create GCS sensors for the specified buckets and prefixes.
-
-2. **Dynamically Create Sensors**:
-   - For each bucket and file prefix combination, a new `GCSObjectsWithPrefixExistenceSensor` is created. The bucket name is formatted using the environment variable `AIRFLOW_VAR_ENV`, and the file prefix is combined with the schedule timestamp (`schedule_dts`).
-   - A task ID (`tid`) is generated dynamically. If the length of the `tid` combined with the `dag_id` exceeds 175 characters, the task ID is truncated and shortened to ensure it complies with Airflow's character limit.
-
-3. **Task Dependencies**:
-   - The `start_<table_name>` task triggers the dynamically created sensors, which in turn trigger the `preprocess_<table_name>` task once the files are detected in GCS.
-
+   
 4. **Sensor Configuration**:
    - Each sensor uses the `IMPERSONATION_CHAIN` for authentication and has a specific timeout configured via `parameter['sensor_timeout'][sensor]`. Sensors are pooled using the `pool_sensor` resource.
+  
+# Cross-Cluster Dependence Setup
+
+## Overview
+This code handles the creation of sensors for cross-cluster file dependencies in an Airflow DAG. The sensors check if specific dependency files exist in a Google Cloud Storage (GCS) bucket, based on the scheduled timestamp and DAG configuration.
+
+## Purpose
+- Dynamically create GCS sensors to check for cross-cluster file dependencies based on the DAG schedule and file existence in GCS.
+- Handle cross-cluster data dependencies by ensuring certain files are available before triggering downstream tasks.
+
+## Parameters
+- **parameter['cross_cluster_dependance']**: A boolean flag that indicates whether cross-cluster dependence is required for the DAG.
+- **parameter['cross_dependancy_dag_id']**: A list of DAG IDs that represent the cross-cluster dependencies.
+- **parameter['cross_dependancy_execution_delta']**: A list of time delta expressions used to calculate the execution time for the dependency check.
+- **parameter['cross_dependancy_day']**: A list indicating whether the dependency check is based on daily or hourly intervals.
+- **parameter['cross_dependancy_sensor_timeout']**: A list of timeouts for the cross-cluster sensors, determining how long they will wait for the specified files to appear.
+
+### Internal Variables:
+- **IMPERSONATION_CHAIN**: The service account used to impersonate credentials for accessing GCS. Derived from the Airflow environment variable `AIRFLOW_VAR_WORK_PROJECT`.
+- **bucket_tre**: The GCS bucket where cross-cluster dependencies are stored, constructed using the environment variable `AIRFLOW_VAR_ENV`.
+
+## Returns
+- **GCSObjectsWithPrefixExistenceSensor**: A dynamically created GCS sensor for each cross-cluster dependency file.
+- **Task ID (tid)**: The task ID is dynamically generated and truncated if necessary to comply with the character limit (max 175 characters for `tid` + `dag_id`).
+
+## Authentication
+- **Impersonated Credentials**: The function uses the `IMPERSONATION_CHAIN` to authenticate and access GCS resources.
+- **Google Cloud Storage**: The sensor uses the default Google Cloud connection ID (`google_cloud_default`) to interact with GCS.
+
+## Functionality
+
+1. **Check for Cross-Cluster Dependence**:
+   - The function checks if `parameter['cross_cluster_dependance']` is set to `True`. If so, it proceeds to create GCS sensors for the cross-cluster dependencies specified in the DAG parameters.
+
+2. **Dynamically Create Sensors**:
+   - For each dependency listed in `parameter['cross_dependancy_dag_id']`, the function generates a schedule timestamp (`schedule_dts_cross_cluster`) based on whether the dependency is daily or hourly.
+   - A task ID (`tid`) is generated dynamically. If the length of the `tid` combined with the `dag_id` exceeds 175 characters, the task ID is truncated and shortened to ensure it complies with Airflow's character limit.
+
+3. **Task Dependencies**:
+   - The `start_<table_name>` task triggers the dynamically created sensors, which in turn trigger the `preprocess_<table_name>` task once the dependency files are detected in GCS.
+
+4. **Sensor Configuration**:
+   - Each sensor uses the `IMPERSONATION_CHAIN` for authentication and has a specific timeout configured via `parameter['cross_dependancy_sensor_timeout'][sensor]`. Sensors are pooled using the `pool_sensor` resource.
+
+# DAG Dependence Setup
+
+## Overview
+This section of the code creates an Airflow `ExternalTaskSensor` for monitoring the completion of external DAG tasks before proceeding with downstream tasks in the current DAG. The external dependencies are dynamically created based on the configuration passed in the `parameter` dictionary.
+
+## Purpose
+- Create sensors to monitor external DAG task completions.
+- Ensure that the current DAG's tasks only execute after the external tasks have successfully completed.
+
+## Parameters
+- **parameter['dag_dependance']**: A boolean flag indicating whether external DAG task dependencies should be set up.
+- **parameter['dag_external_dag_id']**: A list of external DAG IDs that the current DAG depends on.
+- **parameter['dag_external_task_id']**: A list of external task IDs within the specified DAGs that need to be monitored.
+- **parameter['execution_delta']**: A list of time deltas used to adjust the external task execution times relative to the current DAG schedule.
+- **parameter['ext_sensor_timeout']**: A list of timeouts for each `ExternalTaskSensor`, determining how long the sensor will wait for the external tasks to complete.
+
+### Internal Variables:
+- **tid**: The task ID for each sensor, dynamically generated based on the external DAG and task IDs. If the total length of the `tid` and `dag_id` exceeds 175 characters, the task ID is shortened.
+- **sensor_count**: A counter used to generate unique task IDs if they exceed the character limit.
+
+## Returns
+- **ExternalTaskSensor**: A dynamically created `ExternalTaskSensor` for monitoring external DAG task dependencies.
+- **Task ID (tid)**: A unique task ID for each sensor. If the `tid` exceeds the character limit, it is truncated to ensure it complies with Airflow's constraints.
+
+## Authentication
+- No additional authentication is required as the `ExternalTaskSensor` uses Airflow's internal mechanisms to monitor the external DAGs.
+
+## Functionality
+
+1. **Check for DAG Dependence**:
+   - The function checks if `parameter['dag_dependance']` is set to `True`. If so, it proceeds to create external task sensors for each dependency specified in the parameters.
+
+2. **Dynamically Create Sensors**:
+   - For each external DAG ID and task ID in `parameter['dag_external_dag_id']` and `parameter['dag_external_task_id']`, a corresponding `ExternalTaskSensor` is created.
+   - The task ID (`tid`) is generated based on the external DAG and task IDs. If the combined length of the `tid` and `dag_id` exceeds 175 characters, the task ID is shortened.
+
+3. **Task Dependencies**:
+   - The `start_<table_name>` task triggers the dynamically created external task sensors. Once the external task is confirmed to have completed, the sensor triggers the `preprocess_<table_name>` task.
+
+4. **Sensor Configuration**:
+   - Each sensor monitors a specific external DAG task using `external_dag_id` and `external_task_id`.
+   - The `execution_delta` is used to adjust the external task execution time relative to the current DAG's schedule.
+   - Each sensor has a timeout, set by `parameter['ext_sensor_timeout'][ext_sensor]`, to control how long it will wait for the external task to complete. Sensors are pooled using the `pool_sensor` resource.
