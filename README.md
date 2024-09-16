@@ -46,26 +46,3 @@ The `create_dag` function dynamically creates an Airflow DAG based on the provid
 
 ---
 
-### Example Usage:
-
-```python
-dag = create_dag(
-    dag_id="example_dag",
-    max_active_runs=1,
-    catchup=False,
-    schedule="0 12 * * *",  # Daily at noon
-    default_args={"owner": "airflow", "start_date": datetime(2023, 1, 1)},
-    sublocation="us-west1",
-    master_batch_payload_limit=1000,
-    subarr=["task_1", "task_2"],
-    master_file="data_file.csv",
-    service_account="my-service-account@my-project.iam.gserviceaccount.com",
-    label_key="env",
-    pipeline_name="my_pipeline",
-    audit_details={"log_level": "INFO"},
-    create_cross_cluster_trigger=False,
-    dataset_schedule="0 6 * * *",  # Dataset schedule
-    dataset_schedule_trigger=True,
-    desc="Example Airflow DAG",
-    tag_array=["example", "pipeline"]
-)
