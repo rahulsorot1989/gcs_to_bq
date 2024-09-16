@@ -166,3 +166,126 @@ This function handles the triggering of CIF (Customer Information File) events i
 
 5. **Task Dependencies**:
    - The dynamically created operator is assigned to the `start_<table_name>` and `preprocess_<table_name>` tasks to control the workflow.
+
+# GCS File Dependence Sensor Setup
+
+## Overview
+This code section handles the setup of Google Cloud Storage (GCS) sensors in an Airflow DAG. These sensors check for the existence of specific files in GCS buckets, using a predefined prefix and bucket structure. If the file dependence condition is `True`, a sensor is dynamically created for each bucket and prefix combination.
+
+## Purpose
+- Dynamically create GCS sensors to check for the existence of files in GCS based on the DAG's schedule.
+- Ensure that specific files exist in GCS buckets before triggering downstream tasks in the DAG.
+
+## Parameters
+- **parameter['file_dependance']**: A boolean flag that indicates whether file dependence is required for the DAG.
+- **parameter['sensor_bucket']**: A list of GCS bucket names, where each bucket is formatted using the environment variable `AIRFLOW_VAR_ENV`.
+- **parameter['sensor_file_prefix']**: A list of file prefixes to be used by the GCS sensors when searching for files.
+- **parameter['sensor_timeout']**: A list of timeouts for the GCS sensors, determining how long they will wait for the specified file to appear.
+- **table_name_full**: The full name of the table, used to create task IDs dynamically.
+- **schedule_dts**: The schedule timestamp used to construct the file prefix for the GCS sensor.
+
+### Internal Variables:
+- **IMPERSONATION_CHAIN**: The service account used to impersonate credentials for accessing GCS. Derived from the Airflow environment variable `AIRFLOW_VAR_WORK_PROJECT`.
+
+## Returns
+- **GCSObjectsWithPrefixExistenceSensor**: A dynamically created GCS sensor for each file prefix and bucket combination.
+- **Task ID (tid)**: The task ID is dynamically generated and truncated if necessary to comply with the character limit (max 175 characters for `tid` + `dag_id`).
+
+## Authentication
+- **Impersonated Credentials**: The function uses the `IMPERSONATION_CHAIN` to authenticate and access GCS resources.
+- **Google Cloud Storage**: The sensor uses the default Google Cloud connection ID (`google_cloud_default`) to interact with GCS.
+
+## Functionality
+
+1. **Check for File Dependence**:
+   - The function first checks if `parameter['file_dependance']` is set to `True`. If so, it proceeds to create GCS sensors for the specified buckets and prefixes.
+
+2. **Dynamically Create Sensors**:
+   - For each bucket and file prefix combination, a new `GCSObjectsWithPrefixExistenceSensor` is created. The bucket name is formatted using the environment variable `AIRFLOW_VAR_ENV`, and the file prefix is combined with the schedule timestamp (`schedule_dts`).
+   - A task ID (`tid`) is generated dynamically. If the length of the `tid` combined with the `dag_id` exceeds 175 characters, the task ID is truncated and shortened to ensure it complies with Airflow's character limit.
+
+3. **Task Dependencies**:
+   - The `start_<table_name>` task triggers the dynamically created sensors, which in turn trigger the `preprocess_<table_name>` task once the files are detected in GCS.
+
+  # GCS File Dependence Sensor Setup
+
+## Overview
+This code section handles the setup of Google Cloud Storage (GCS) sensors in an Airflow DAG. These sensors check for the existence of specific files in GCS buckets, using a predefined prefix and bucket structure. If the file dependence condition is `True`, a sensor is dynamically created for each bucket and prefix combination.
+
+## Purpose
+- Dynamically create GCS sensors to check for the existence of files in GCS based on the DAG's schedule.
+- Ensure that specific files exist in GCS buckets before triggering downstream tasks in the DAG.
+
+## Parameters
+- **parameter['file_dependance']**: A boolean flag that indicates whether file dependence is required for the DAG.
+- **parameter['sensor_bucket']**: A list of GCS bucket names, where each bucket is formatted using the environment variable `AIRFLOW_VAR_ENV`.
+- **parameter['sensor_file_prefix']**: A list of file prefixes to be used by the GCS sensors when searching for files.
+- **parameter['sensor_timeout']**: A list of timeouts for the GCS sensors, determining how long they will wait for the specified file to appear.
+- **table_name_full**: The full name of the table, used to create task IDs dynamically.
+- **schedule_dts**: The schedule timestamp used to construct the file prefix for the GCS sensor.
+
+### Internal Variables:
+- **IMPERSONATION_CHAIN**: The service account used to impersonate credentials for accessing GCS. Derived from the Airflow environment variable `AIRFLOW_VAR_WORK_PROJECT`.
+
+## Returns
+- **GCSObjectsWithPrefixExistenceSensor**: A dynamically created GCS sensor for each file prefix and bucket combination.
+- **Task ID (tid)**: The task ID is dynamically generated and truncated if necessary to comply with the character limit (max 175 characters for `tid` + `dag_id`).
+
+## Authentication
+- **Impersonated Credentials**: The function uses the `IMPERSONATION_CHAIN` to authenticate and access GCS resources.
+- **Google Cloud Storage**: The sensor uses the default Google Cloud connection ID (`google_cloud_default`) to interact with GCS.
+
+## Functionality
+
+1. **Check for File Dependence**:
+   - The function first checks if `parameter['file_dependance']` is set to `True`. If so, it proceeds to create GCS sensors for the specified buckets and prefixes.
+
+2. **Dynamically Create Sensors**:
+   - For each bucket and file prefix combination, a new `GCSObjectsWithPrefixExistenceSensor` is created. The bucket name is formatted using the environment variable `AIRFLOW_VAR_ENV`, and the file prefix is combined with the schedule timestamp (`schedule_dts`).
+   - A task ID (`tid`) is generated dynamically. If the length of the `tid` combined with the `dag_id` exceeds 175 characters, the task ID is truncated and shortened to ensure it complies with Airflow's character limit.
+
+3. **Task Dependencies**:
+   - The `start_<table_name>` task triggers the dynamically created sensors, which in turn trigger the `preprocess_<table_name>` task once the files are detected in GCS.
+
+  # GCS File Dependence Sensor Setup
+
+## Overview
+This code section handles the setup of Google Cloud Storage (GCS) sensors in an Airflow DAG. These sensors check for the existence of specific files in GCS buckets, using a predefined prefix and bucket structure. If the file dependence condition is `True`, a sensor is dynamically created for each bucket and prefix combination.
+
+## Purpose
+- Dynamically create GCS sensors to check for the existence of files in GCS based on the DAG's schedule.
+- Ensure that specific files exist in GCS buckets before triggering downstream tasks in the DAG.
+
+## Parameters
+- **parameter['file_dependance']**: A boolean flag that indicates whether file dependence is required for the DAG.
+- **parameter['sensor_bucket']**: A list of GCS bucket names, where each bucket is formatted using the environment variable `AIRFLOW_VAR_ENV`.
+- **parameter['sensor_file_prefix']**: A list of file prefixes to be used by the GCS sensors when searching for files.
+- **parameter['sensor_timeout']**: A list of timeouts for the GCS sensors, determining how long they will wait for the specified file to appear.
+- **table_name_full**: The full name of the table, used to create task IDs dynamically.
+- **schedule_dts**: The schedule timestamp used to construct the file prefix for the GCS sensor.
+
+### Internal Variables:
+- **IMPERSONATION_CHAIN**: The service account used to impersonate credentials for accessing GCS. Derived from the Airflow environment variable `AIRFLOW_VAR_WORK_PROJECT`.
+
+## Returns
+- **GCSObjectsWithPrefixExistenceSensor**: A dynamically created GCS sensor for each file prefix and bucket combination.
+- **Task ID (tid)**: The task ID is dynamically generated and truncated if necessary to comply with the character limit (max 175 characters for `tid` + `dag_id`).
+
+## Authentication
+- **Impersonated Credentials**: The function uses the `IMPERSONATION_CHAIN` to authenticate and access GCS resources.
+- **Google Cloud Storage**: The sensor uses the default Google Cloud connection ID (`google_cloud_default`) to interact with GCS.
+
+## Functionality
+
+1. **Check for File Dependence**:
+   - The function first checks if `parameter['file_dependance']` is set to `True`. If so, it proceeds to create GCS sensors for the specified buckets and prefixes.
+
+2. **Dynamically Create Sensors**:
+   - For each bucket and file prefix combination, a new `GCSObjectsWithPrefixExistenceSensor` is created. The bucket name is formatted using the environment variable `AIRFLOW_VAR_ENV`, and the file prefix is combined with the schedule timestamp (`schedule_dts`).
+   - A task ID (`tid`) is generated dynamically. If the length of the `tid` combined with the `dag_id` exceeds 175 characters, the task ID is truncated and shortened to ensure it complies with Airflow's character limit.
+
+3. **Task Dependencies**:
+   - The `start_<table_name>` task triggers the dynamically created sensors, which in turn trigger the `preprocess_<table_name>` task once the files are detected in GCS.
+
+4. **Sensor Configuration**:
+   - Each sensor uses the `IMPERSONATION_CHAIN` for authentication and has a specific timeout configured via `parameter['sensor_timeout'][sensor]`. Sensors are pooled using the `pool_sensor` resource.
