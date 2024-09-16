@@ -85,4 +85,84 @@ The `_start_template_dataflow` function launches a Google Cloud Dataflow job usi
 
 ---
 
+# Cross-Cluster Trigger Creation
 
+## Overview
+This section of the code handles the creation of a cross-cluster trigger within an Airflow DAG. It uploads a file to a Google Cloud Storage (GCS) bucket that acts as a signal for downstream processes in a different cluster. The trigger is dependent on the Airflow DAG's schedule timestamp.
+
+## Purpose
+- Creates a cross-cluster trigger that signals downstream tasks in different clusters.
+- Uploads a trigger file to a designated Google Cloud Storage bucket, which contains a timestamp to coordinate execution between clusters.
+
+## Parameters
+- **create_cross_cluster_trigger**: A boolean flag indicating whether the cross-cluster trigger functionality is enabled.
+- **file_nm**: The name of the file to be uploaded as a trigger. Defaults to the DAG ID.
+- **dag_id**: The unique identifier for the DAG, used to name the file if no specific file name is provided.
+- **context**: Airflow's execution context, which includes information such as the DAG's schedule timestamp (`ts`).
+
+### Internal Variables:
+- **COMPOSER_DEPENDANCY_BUCKET**: The name of the Google Cloud Storage bucket where the trigger file is uploaded. Derived from an environment variable.
+
+## Returns
+- **create_cross_cluster_trigger**: A dynamically created `PythonOperator` that uploads the cross-cluster trigger to GCS.
+
+## Authentication
+- **Google Cloud Storage**: The code uses the `google.cloud.storage.Client()` to authenticate and interact with a Composer dependency bucket for uploading the cross-cluster trigger file.
+
+## Functionality
+
+1. **Check if Cross-Cluster Trigger is Enabled**:
+   - The function checks if the `create_cross_cluster_trigger` flag is set to `True`. If so, it proceeds to define a custom Python function for uploading a trigger file.
+
+2. **Trigger Creation Function (`create_cross_cluster_trigger_fun`)**:
+   - This internal function constructs the trigger file name using the DAG's schedule timestamp (`ts`). The timestamp is split into date and hour components to create a formatted string (`schedule_dts`), which is then appended to the `file_nm` to generate a unique file name.
+   - The function then retrieves the bucket name from an environment variable and uploads the trigger file to the specified bucket in Google Cloud Storage.
+
+3. **PythonOperator for Cross-Cluster Trigger**:
+   - A `PythonOperator` is dynamically created to call the `create_cross_cluster_trigger_fun` function. The operator is linked to the `end` task of the DAG, ensuring that the trigger is uploaded after all other tasks have completed.
+
+4. **Task Dependencies**:
+   - The `end` task is configured to trigger the `create_cross_cluster_trigger` task if cross-cluster triggering is enabled.
+
+# CIF Trigger Function
+
+## Overview
+This function handles the triggering of CIF (Customer Information File) events in an Airflow DAG. It uploads a specific file to a Google Cloud Storage (GCS) bucket, based on the configuration provided in the DAG parameters. If the CIF trigger is not present in the parameters, a `DummyOperator` is used as a placeholder.
+
+## Purpose
+- Executes a file upload to a Google Cloud Storage bucket that triggers downstream tasks for a specific CIF event.
+- Uses impersonated credentials for secure access to GCS.
+
+## Parameters
+- **parameter['cif_trigger']**: A dictionary containing the necessary information for the CIF trigger, including `db_type` and `file_name`.
+- **file_nm**: A dictionary passed to the CIF trigger function containing details about the database type and file name.
+- **table_name**: The name of the table, dynamically used to create task IDs.
+- **context**: The Airflow execution context, passed through the `PythonOperator`.
+
+### Internal Variables:
+- **IMPERSONATION_CHAIN**: The service account used to impersonate credentials for accessing GCS. Derived from the Airflow environment variable `AIRFLOW_VAR_WORK_PROJECT`.
+- **logs_bucket**: The name of the GCS bucket where logs are stored, built using the environment variable `AIRFLOW_VAR_ENV`.
+
+## Returns
+- **start_<table_name>**: A dynamically created `PythonOperator` or `DummyOperator`, depending on whether the CIF trigger is present in the parameters.
+
+## Authentication
+- **Impersonated Credentials**: The function uses `google.auth.impersonated_credentials.Credentials` to impersonate the target service account for secure access to the GCS bucket.
+- **Google Cloud Storage**: The `storage.Client` is initialized with the impersonated credentials to interact with GCS.
+
+## Functionality
+
+1. **Check for CIF Trigger in Parameters**:
+   - The function checks if the `cif_trigger` is present in the parameters. If so, it proceeds to define a custom Python function (`cif1_trigger`) to upload the trigger file to GCS.
+
+2. **CIF Trigger Function (`cif1_trigger`)**:
+   - This function generates the trigger file name using the `db_type` and `file_name` from the `file_nm` dictionary. It then uploads the file to the specified GCS bucket.
+
+3. **Impersonated Credentials**:
+   - The function uses impersonated credentials to securely access the GCS bucket. If no impersonated credentials are available, default credentials are used.
+
+4. **PythonOperator or DummyOperator**:
+   - A `PythonOperator` is dynamically created to call the `cif1_trigger` function. If the `cif_trigger` is not present in the parameters, a `DummyOperator` is used instead.
+
+5. **Task Dependencies**:
+   - The dynamically created operator is assigned to the `start_<table_name>` and `preprocess_<table_name>` tasks to control the workflow.
