@@ -2378,4 +2378,509 @@ The `venv_yaml_validation_check` function performs a YAML validation check on a 
 **Note**: This function is essential for ensuring data quality by validating that the data conforms to predefined YAML configurations. By integrating with Airflow and using impersonated credentials, it ensures secure and automated data validation within the Google Cloud environment.
 
 
+# Pre-Shell Execution Task
+
+## Overview
+
+The `pre_shell_execution` task is designed to execute a series of shell commands before the main pipeline process runs within an Airflow DAG. The commands are executed using the `BashOperator` and impersonated credentials to ensure secure access to Google Cloud resources.
+
+## Purpose
+
+- **Execute Shell Commands**: Runs custom shell commands necessary for environment setup or performing prerequisite actions before the main pipeline execution.
+- **Service Account Impersonation**: Uses Google Cloud impersonation to execute commands under a specified service account.
+- **Dynamic Command Construction**: Builds the command string dynamically based on parameters provided, allowing flexibility and customization.
+
+## Parameters
+
+- **processing_modules** *(list)*: A list of processing modules to check if the pre-shell execution task should be included.
+  - **Optional**: No
+- **parameter** *(dict)*: A dictionary of configuration parameters for the task.
+  - **Keys**:
+    - **pre_shell_execution_cmd** *(list of str)*: A list of shell commands to be executed.
+      - **Optional**: No
+    - **service_account** *(str)*: The service account email to be used for impersonation.
+      - **Optional**: No
+    - **serviceAccountEmail** *(str)*: Template for the service account email.
+      - **Optional**: Yes
+- **IMPERSONATION_CHAIN** *(str)*: The service account email used for impersonation.
+  - **Optional**: No
+- **table_name** *(str)*: The name of the table or task, used for creating unique task IDs.
+  - **Optional**: No
+- **os.environ['AIRFLOW_VAR_WORK_PROJECT']** *(str)*: Environment variable representing the work project ID.
+  - **Optional**: No
+- **os.environ['AIRFLOW_VAR_ENV']** *(str)*: Environment variable representing the environment (e.g., 'dev', 'prod').
+  - **Optional**: No
+
+### Internal Variables
+
+- **cmd_list** *(list of str)*: List of shell commands to be executed.
+- **service_account** *(str)*: Service account email extracted from parameters.
+- **commands** *(str)*: The concatenated string of shell commands.
+- **pre_commands** *(str)*: The full shell command string that includes authentication and the list of commands.
+
+## Returns
+
+- **Return Type**: None. The function adds the task to the Airflow DAG.
+- **Side Effects**: Executes the shell commands in the Airflow environment before the main pipeline starts.
+
+## Authentication
+
+- **Services Used**:
+  - **Google Cloud Platform**: Uses `gcloud` for authentication and command execution.
+  - **Apache Airflow**: Manages task execution in the DAG.
+  
+- **Authentication Methods**:
+  - **Service Account Impersonation**: Uses `gcloud auth login --quiet --impersonate-service-account` to authenticate as the specified service account.
+
+- **Permissions Required**:
+  - The executing user or service account must have the `roles/iam.serviceAccountTokenCreator` role on the target service account.
+  - The target service account must have the necessary permissions to execute the shell commands.
+
+## Functionality
+
+1. **Check for Pre-Shell Execution Module**:
+   - The task checks if `'pre_shell_execution'` is included in the `processing_modules` list. If it is, the task is constructed.
+
+2. **Retrieve Commands and Service Account**:
+   - Extracts `cmd_list` from `parameter["pre_shell_execution_cmd"]`.
+   - Extracts `service_account` from `parameter["service_account"]`.
+
+3. **Construct Commands String**:
+   - Iterates over the `cmd_list` and concatenates the commands into a single formatted string.
+     ```python
+     commands = ''
+     for cmd in cmd_list:
+         if commands == '':
+             commands = cmd
+         else:
+             commands = commands + "\n\t" + cmd
+     ```
+
+4. **Format Pre-Commands String**:
+   - Constructs the `pre_commands` string, which includes the authentication command and the shell commands to be executed:
+     ```python
+     pre_commands = """
+           gcloud auth login --quiet --impersonate-service-account={IMPERSONATION_CHAIN}
+           %s
+     """.format(IMPERSONATION_CHAIN=IMPERSONATION_CHAIN) % (commands).format(
+         serviceAccountEmail=parameter['serviceAccountEmail'].format(
+             work_project=os.environ['AIRFLOW_VAR_WORK_PROJECT']
+         )
+     )
+     ```
+   - Formats `pre_commands` with the environment variable `os.environ['AIRFLOW_VAR_ENV']`:
+     ```python
+     pre_commands = pre_commands.format(env=os.environ['AIRFLOW_VAR_ENV'])
+     ```
+
+5. **Create BashOperator Task**:
+   - Dynamically creates a `BashOperator` task in the DAG using `globals()`:
+     ```python
+     globals()['pre_shell_execution_' + str(table_name)] = BashOperator(
+         task_id='pre_shell_execution_' + str(table_name),
+         bash_command=pre_commands,
+         do_xcom_push=True,
+         retries=0
+     )
+     ```
+
+## Error Handling
+
+- **Default Error Handling**: Airflow handles task retries and failure alerts based on its configuration.
+- **Debugging**: Uses `print` statements for debugging the command list and `pre_commands`.
+
+## Edge Cases
+
+- **Missing Parameters**: If necessary parameters are missing from `parameter`, the task will fail.
+- **Invalid Commands**: If the shell commands fail or are invalid, the task will fail.
+
+# Post-Shell Execution Task
+
+## Overview
+
+The **Post-Shell Execution Task** is designed to execute a series of shell commands after the main pipeline process runs within an Airflow DAG. The commands are executed using the `BashOperator` and impersonated credentials to ensure secure access to Google Cloud resources.
+
+## Purpose
+
+- **Execute Post-Pipeline Shell Commands**: Runs custom shell commands required after the main pipeline execution, such as cleanup or logging.
+- **Service Account Impersonation**: Uses Google Cloud impersonation to execute commands under a specified service account.
+- **Dynamic Command Construction**: Builds the command string dynamically based on parameters provided, allowing flexibility and customization.
+
+## Parameters
+
+- **processing_modules** *(list)*: A list of processing modules to check if the post-shell execution task should be included.
+  - **Optional**: No
+- **parameter** *(dict)*: A dictionary of configuration parameters for the task.
+  - **Keys**:
+    - **post_shell_execution_cmd** *(list of str)*: A list of shell commands to be executed.
+      - **Optional**: No
+    - **service_account** *(str)*: The service account email to be used for impersonation.
+      - **Optional**: No
+    - **serviceAccountEmail** *(str)*: Template for the service account email.
+      - **Optional**: Yes
+- **IMPERSONATION_CHAIN** *(str)*: The service account email used for impersonation.
+  - **Optional**: No
+- **table_name** *(str)*: The name of the table or task, used for creating unique task IDs.
+  - **Optional**: No
+- **os.environ['AIRFLOW_VAR_WORK_PROJECT']** *(str)*: Environment variable representing the work project ID.
+  - **Optional**: No
+- **os.environ['AIRFLOW_VAR_ENV']** *(str)*: Environment variable representing the environment (e.g., 'dev', 'prod').
+  - **Optional**: No
+
+### Internal Variables
+
+- **cmd_list** *(list of str)*: List of shell commands to be executed.
+- **service_account** *(str)*: Service account email extracted from parameters.
+- **commands** *(str)*: The concatenated string of shell commands.
+- **post_commands** *(str)*: The full shell command string that includes authentication and the list of commands.
+
+## Returns
+
+- **Return Type**: None. The function adds the task to the Airflow DAG.
+- **Side Effects**: Executes the shell commands in the Airflow environment after the main pipeline runs.
+
+## Authentication
+
+- **Services Used**:
+  - **Google Cloud Platform**: Uses `gcloud` for authentication and command execution.
+  - **Apache Airflow**: Manages task execution in the DAG.
+  
+- **Authentication Methods**:
+  - **Service Account Impersonation**: Uses `gcloud auth login --quiet --impersonate-service-account` to authenticate as the specified service account.
+
+- **Permissions Required**:
+  - The executing user or service account must have the `roles/iam.serviceAccountTokenCreator` role on the target service account.
+  - The target service account must have the necessary permissions to execute the shell commands.
+
+## Functionality
+
+1. **Check for Post-Shell Execution Module**:
+   - The task checks if `'post_shell_execution'` is included in the `processing_modules` list. If it is, the task is constructed.
+
+2. **Retrieve Commands and Service Account**:
+   - Extracts `cmd_list` from `parameter["post_shell_execution_cmd"]`.
+   - Extracts `service_account` from `parameter["service_account"]`.
+
+3. **Construct Commands String**:
+   - Iterates over the `cmd_list` and concatenates the commands into a single formatted string.
+     ```python
+     commands = ''
+     for cmd in cmd_list:
+         if commands == '':
+             commands = cmd
+         else:
+             commands = commands + "\n\t" + cmd
+     ```
+
+4. **Format Post-Commands String**:
+   - Constructs the `post_commands` string, which includes the authentication command and the shell commands to be executed:
+     ```python
+     post_commands = """
+           gcloud auth login --quiet --impersonate-service-account={IMPERSONATION_CHAIN}
+           %s
+     """.format(IMPERSONATION_CHAIN=IMPERSONATION_CHAIN) % (commands).format(
+         serviceAccountEmail=parameter['serviceAccountEmail'].format(
+             work_project=os.environ['AIRFLOW_VAR_WORK_PROJECT']
+         )
+     )
+     ```
+   - Formats `post_commands` with the environment variable `os.environ['AIRFLOW_VAR_ENV']`:
+     ```python
+     post_commands = post_commands.format(env=os.environ['AIRFLOW_VAR_ENV'])
+     ```
+
+5. **Create BashOperator Task**:
+   - Dynamically creates a `BashOperator` task in the DAG using `globals()`:
+     ```python
+     globals()['post_shell_execution_' + str(table_name)] = BashOperator(
+         task_id='post_shell_execution_' + str(table_name),
+         bash_command=post_commands,
+         do_xcom_push=True,
+         retries=0
+     )
+     ```
+
+## Error Handling
+
+- **Default Error Handling**: Airflow handles task retries and failure alerts based on its configuration.
+- **Debugging**: Uses `print` statements for debugging the command list and `post_commands`.
+
+## Edge Cases
+
+- **Missing Parameters**: If necessary parameters are missing from `parameter`, the task will fail.
+- **Invalid Commands**: If the shell commands fail or are invalid, the task will fail.
+- **Authentication Failure**: If impersonation is not correctly configured or permissions are insufficient, the task will fail.
+- **String Formatting Errors**: Improper usage of `.format()` or `%` operators can lead to runtime exceptions.
+
+---
+
+**Note**: This task is essential for executing post-pipeline shell commands necessary for cleanup or any post-processing actions. By using service account impersonation, it ensures secure and authorized execution of these commands.
+
+# Data Quality Check Task
+
+## Overview
+
+The **Data Quality Check Task** integrates a data quality validation step within an Airflow pipeline. The task uses the `PythonVirtualenvOperator` to run the data quality checks, leveraging Google Cloud impersonated credentials for secure access. The checks are based on configurations defined in a YAML file.
+
+## Purpose
+
+- **Validate Data Quality**: Executes a series of data quality checks based on rules defined in the YAML configuration.
+- **Impersonated Authentication**: Uses Google Cloud impersonation to securely access BigQuery and other services.
+- **Dynamic Task Execution**: Incorporates dynamic parameters such as `work_table`, `job_id`, and other configurations that are pulled at runtime.
+
+## Parameters
+
+- **processing_modules** *(list)*: List of processing modules to check if the data quality check task should be included.
+  - **Optional**: No
+
+- **parameter** *(dict)*: Configuration dictionary for the task.
+  - **Keys**:
+    - **etl_qa** *(dict)*: YAML data containing the data quality checks to perform.
+      - **Optional**: No
+    - **service_account** *(str)*: Service account email for executing the task.
+      - **Optional**: Yes
+
+- **IMPERSONATION_CHAIN** *(str)*: The service account email used for impersonation.
+  - **Optional**: No
+
+- **table_name** *(str)*: The name of the table or task, used for creating unique task IDs.
+  - **Optional**: No
+
+- **os.environ['AIRFLOW_VAR_WORK_PROJECT']** *(str)*: Environment variable representing the work project ID.
+  - **Optional**: No
+
+- **FRAMEWORKS_VERSION** *(list)*: Python package versions required for the virtual environment.
+
+- **dag** *(Airflow DAG)*: The Airflow DAG to which the task is attached.
+
+### Internal Variables
+
+- **work_table** *(str)*: The table in BigQuery to run data quality checks against.
+- **job_id** *(str)*: Unique job ID for tracking the task execution.
+- **label_key** *(str)*: Label key for identifying the task.
+- **label_value** *(str)*: Label value for categorizing the task.
+- **yaml_data** *(dict)*: The YAML configuration with the data quality check rules.
+- **gcp_project** *(str)*: Google Cloud project where the resources reside.
+- **json_config** *(dict)*: JSON configuration for logging or audit purposes.
+
+## Returns
+
+- **Return Type**: None. The function adds the task to the Airflow DAG.
+- **Side Effects**: Executes data quality checks on a BigQuery table, raising exceptions if any validation fails.
+
+## Authentication
+
+- **Services Used**:
+  - **Google Cloud BigQuery**: Accesses BigQuery to run data quality checks.
+  - **Apache Airflow**: Manages task execution in the DAG.
+
+- **Authentication Methods**:
+  - **Service Account Impersonation**: Uses `google.auth.impersonated_credentials.Credentials` to authenticate the task under the specified service account.
+
+- **Permissions Required**:
+  - The executing user or service account must have the `roles/iam.serviceAccountTokenCreator` role on the target service account.
+  - The target service account must have the necessary permissions to query BigQuery and perform validation checks.
+
+## Functionality
+
+1. **Check for Data Quality Check Module**:
+   - The code first checks if `'dq_quality_check'` is present in the `processing_modules` list. If it is, the task setup begins.
+
+2. **Data Quality Check Execution**:
+   - The `venv_dq_quality_check` function is used to execute the data quality checks. This function is part of the `etlQAPackage` and performs validation based on the YAML configuration.
+
+3. **Set up Impersonated Credentials**:
+   - Impersonated credentials are obtained using `google.auth.impersonated_credentials.Credentials` to securely access Google Cloud resources:
+     ```python
+     tcreds = google.auth.impersonated_credentials.Credentials(
+         source_credentials=source_credentials,
+         target_principal=IMPERSONATION_CHAIN,
+         target_scopes=target_scopes
+     )
+     ```
+
+4. **Data Quality Check**:
+   - The `dataQualityCheck` function is called, passing in the table, job ID, labels, and YAML configuration. The checks are executed in BigQuery:
+     ```python
+     dataQualityCheck.dataQualityCheck(work_table, job_id, label_key, label_value, yaml_data, gcp_project,
+         json_config, credentials=tcreds)
+     ```
+
+5. **Create PythonVirtualenvOperator Task**:
+   - A `PythonVirtualenvOperator` task is dynamically added to the Airflow DAG. This operator runs the data quality checks in a virtual environment:
+     ```python
+     globals()['dq_quality_check_' + str(table_name)] = PythonVirtualenvOperator(
+         task_id="dq_quality_check_" + str(table_name),
+         python_callable=venv_dq_quality_check,
+         requirements=[FRAMEWORKS_VERSION],
+         system_site_packages=True,
+         python_version='3.8',
+         op_kwargs={
+             'work_table': datahub_temp_table.format(
+                 tmp="{{{{ task_instance.xcom_pull('{}') }}}}".format('generate_hashid_' + str(table_name))
+             ),
+             'job_id': "{{{{ task_instance.xcom_pull('{}') }}}}".format("generate_hashid_" + str(table_name)),
+             'label_key': label_key,
+             'label_value': pipeline_name,
+             'yaml_data': parameter['etl_qa'],
+             'gcp_project': os.environ['AIRFLOW_VAR_WORK_PROJECT'],
+             'json_config': audit_details,
+             'airflow_conn_id': '',  # parameter['service_account'],
+             'IMPERSONATION_CHAIN': IMPERSONATION_CHAIN
+         },
+         dag=dag
+     )
+     ```
+
+## Error Handling
+
+- **Airflow Failure Management**: If the data quality checks fail, the task will raise an exception and fail, triggering Airflow's failure handling mechanisms.
+- **Missing Parameters**: If required parameters are missing, the task will fail during setup.
+
+## Edge Cases
+
+- **Invalid YAML Configuration**: If the YAML data quality rules are improperly formatted, the task will fail.
+- **Authentication Failure**: If impersonation is not correctly configured or the service account lacks necessary permissions, the task will fail.
+- **Data Validation Failures**: If the data does not meet the quality check criteria, exceptions will be raised, and the task will fail.
+
+---
+
+**Note**: The data quality check task is critical for ensuring data integrity within a pipeline. By integrating dynamic parameters and secure access using impersonated credentials, this task ensures that data is validated against predefined rules in a safe and scalable way.
+
+# User Defined Check Task
+
+## Overview
+
+The **User Defined Check Task** allows for the execution of custom user-defined data quality checks within an Airflow pipeline. The task leverages the `PythonVirtualenvOperator` to run user-specified validation rules, utilizing Google Cloud impersonated credentials for secure access to necessary resources.
+
+## Purpose
+
+- **Execute Custom Data Quality Checks**: Runs user-defined checks on BigQuery data as defined in the pipeline configuration.
+- **Impersonated Authentication**: Uses Google Cloud impersonation to securely access BigQuery and other services.
+- **Dynamic Task Execution**: Executes custom checks based on dynamic configurations, making it adaptable for various use cases.
+
+## Parameters
+
+- **processing_modules** *(list)*: List of processing modules to check if the user-defined check task should be included.
+  - **Optional**: No
+
+- **parameter** *(dict)*: Configuration dictionary for the task.
+  - **Keys**:
+    - **etl_qa** *(dict)*: Contains user-defined check details including rules and inputs.
+      - **Optional**: No
+    - **service_account** *(str)*: Service account email for executing the task.
+      - **Optional**: Yes
+
+- **IMPERSONATION_CHAIN** *(str)*: The service account email used for impersonation.
+  - **Optional**: No
+
+- **table_name** *(str)*: The name of the table or task, used for creating unique task IDs.
+  - **Optional**: No
+
+- **os.environ['AIRFLOW_VAR_WORK_PROJECT']** *(str)*: Environment variable representing the work project ID.
+  - **Optional**: No
+
+- **os.environ['AIRFLOW_VAR_ENT_PROJECT']** *(str)*: Environment variable representing the enterprise project ID.
+  - **Optional**: No
+
+- **FRAMEWORKS_VERSION** *(list)*: Python package versions required for the virtual environment.
+
+- **dag** *(Airflow DAG)*: The Airflow DAG to which the task is attached.
+
+### Internal Variables
+
+- **work_table** *(str)*: The table in BigQuery where the user-defined checks will be executed.
+- **job_id** *(str)*: Unique job ID for tracking the task execution.
+- **label_key** *(str)*: Label key for identifying the task.
+- **label_value** *(str)*: Label value for categorizing the task.
+- **check_detail** *(dict)*: The specific details of the user-defined checks to perform.
+- **input_checks** *(list)*: Input rules for data validation.
+- **gcp_project** *(str)*: Google Cloud project where the resources reside.
+- **json_config** *(dict)*: JSON configuration for logging or audit purposes.
+- **ent_project** *(str)*: The enterprise project where additional resources may be accessed.
+
+## Returns
+
+- **Return Type**: None. The function adds the task to the Airflow DAG.
+- **Side Effects**: Executes user-defined data checks on a BigQuery table and logs the results.
+
+## Authentication
+
+- **Services Used**:
+  - **Google Cloud BigQuery**: Accesses BigQuery to run user-defined checks.
+  - **Apache Airflow**: Manages task execution in the DAG.
+
+- **Authentication Methods**:
+  - **Service Account Impersonation**: Uses `google.auth.impersonated_credentials.Credentials` to authenticate the task under the specified service account.
+
+- **Permissions Required**:
+  - The executing user or service account must have the `roles/iam.serviceAccountTokenCreator` role on the target service account.
+  - The target service account must have the necessary permissions to query BigQuery and perform validation checks.
+
+## Functionality
+
+1. **Check for User Defined Check Module**:
+   - The code first checks if `'user_defined_check'` is present in the `processing_modules` list. If it is, the task setup begins.
+
+2. **User Defined Check Execution**:
+   - The `user_defined_checks` function is used to execute the custom checks. This function is part of the `etlQAPackage` and validates data based on user-defined input rules.
+
+3. **Set up Impersonated Credentials**:
+   - Impersonated credentials are obtained using `google.auth.impersonated_credentials.Credentials` to securely access Google Cloud resources:
+     ```python
+     tcreds = google.auth.impersonated_credentials.Credentials(
+         source_credentials=source_credentials,
+         target_principal=IMPERSONATION_CHAIN,
+         target_scopes=target_scopes
+     )
+     ```
+
+4. **Execute User Defined Check**:
+   - The `venv_user_defined_check` function from the `userdefinedcheck` module is called to execute the custom checks:
+     ```python
+     userdefinedcheck.venv_user_defined_check(work_table, job_id, label_key, label_value, gcp_project, json_config, check_detail, input_checks, ent_project, credentials=tcreds)
+     ```
+
+5. **Create PythonVirtualenvOperator Task**:
+   - A `PythonVirtualenvOperator` task is dynamically added to the Airflow DAG. This operator runs the user-defined checks in a virtual environment:
+     ```python
+     globals()['user_defined_check_' + str(table_name)] = PythonVirtualenvOperator(
+         task_id="user_defined_check_" + str(table_name),
+         python_callable=user_defined_checks,
+         requirements=[FRAMEWORKS_VERSION],
+         system_site_packages=True,
+         python_version='3.8',
+         op_kwargs={
+             'work_table': datahub_temp_table.format(
+                 tmp="{{{{ task_instance.xcom_pull('{}') }}}}".format('generate_hashid_' + str(table_name))
+             ),
+             'job_id': "{{{{ task_instance.xcom_pull('{}') }}}}".format("generate_hashid_" + str(table_name)),
+             'label_key': label_key,
+             'label_value': pipeline_name,
+             'check_detail': parameter["etl_qa"]["user_defined_checks"]["check_detail"],
+             'input_checks': parameter["etl_qa"]["user_defined_checks"]["input_checks"],
+             'gcp_project': os.environ['AIRFLOW_VAR_WORK_PROJECT'],
+             'json_config': audit_details,
+             'ent_project': os.environ['AIRFLOW_VAR_ENT_PROJECT'],
+             'airflow_conn_id': '',  # parameter['service_account'],
+             'IMPERSONATION_CHAIN': IMPERSONATION_CHAIN
+         },
+         dag=dag
+     )
+     ```
+
+## Error Handling
+
+- **Airflow Failure Management**: If the user-defined checks fail, the task will raise an exception and fail, triggering Airflow's failure handling mechanisms.
+- **Missing Parameters**: If required parameters are missing, the task will fail during setup.
+
+## Edge Cases
+
+- **Invalid User Checks**: If the user-defined checks are improperly formatted, the task will fail.
+- **Authentication Failure**: If impersonation is not correctly configured or the service account lacks necessary permissions, the task will fail.
+- **Validation Failures**: If the data does not meet the user-defined check criteria, exceptions will be raised, and the task will fail.
+
+---
+
+**Note**: The user-defined check task is essential for adding customized data validation steps within a pipeline. By leveraging dynamic parameters and secure access through impersonated credentials, this task ensures flexible and scalable data validation.
 
