@@ -1824,5 +1824,558 @@ The `venv_null_check` function performs a null value check on specified columns 
 **Note**: This function is crucial for maintaining data quality within data pipelines by identifying and handling null values in BigQuery tables. By integrating with Airflow and utilizing impersonated credentials, it ensures secure and efficient data processing within the Google Cloud environment.
 
 
+# Deduplication Task Function
+
+## Overview
+
+The `venv_dedup_task` function performs deduplication on a specified BigQuery table within an Airflow DAG. It uses impersonated credentials for secure access to Google Cloud resources and integrates with Airflow using the `PythonVirtualenvOperator`.
+
+## Purpose
+
+- **Data Deduplication**: Removes duplicate records from a BigQuery table based on specified keys.
+- **Automated Pipeline Integration**: Incorporates deduplication as a step in an Airflow data pipeline.
+- **Secure Authentication**: Utilizes impersonated credentials for secure and authorized access to Google Cloud services.
+
+## Parameters
+
+- **work_table** *(str)*: The BigQuery table where deduplication will be performed.
+  - **Optional**: No
+- **job_id** *(str)*: A unique identifier for the deduplication job.
+  - **Optional**: No
+- **label_key** *(str)*: A key used for labeling the BigQuery job.
+  - **Optional**: No
+- **label_value** *(str)*: A value associated with the label key for job tracking.
+  - **Optional**: No
+- **staging_table** *(str)*: The staging table used during the deduplication process.
+  - **Optional**: No
+- **dedup_key_id** *(str or list)*: The key(s) used to identify duplicates.
+  - **Optional**: No
+- **where_clause_field** *(str)*: Additional conditions for deduplication.
+  - **Optional**: Yes
+  - **Default Value**: None
+- **gcp_project** *(str)*: The Google Cloud project ID.
+  - **Optional**: No
+- **json_config** *(dict)*: JSON configuration for auditing or additional settings.
+  - **Optional**: Yes
+  - **Default Value**: None
+- **airflow_conn_id** *(str)*: Airflow connection ID for credentials.
+  - **Optional**: Yes
+  - **Default Value**: `''`
+- **IMPERSONATION_CHAIN** *(str)*: The service account email used for impersonation.
+  - **Optional**: No
+
+### Internal Variables
+
+- **target_scopes** *(list)*: The OAuth scopes required for impersonation.
+- **source_credentials** *(Credentials)*: The source credentials obtained from the environment.
+- **tcreds** *(Credentials)*: The impersonated credentials used for authentication.
+
+## Returns
+
+- **None**: The function does not return a value; it performs deduplication on the specified table.
+- **Side Effects**: Modifies the BigQuery table by removing duplicate records.
+
+## Authentication
+
+- **Services Used**:
+  - Google Cloud BigQuery
+  - Google Cloud IAM for service account impersonation
+- **Authentication Methods**:
+  - **Impersonated Credentials**: Uses `google.auth.impersonated_credentials.Credentials` to impersonate the target service account specified by `IMPERSONATION_CHAIN`.
+- **Permissions Required**:
+  - The source service account must have the `roles/iam.serviceAccountTokenCreator` role on the target service account.
+  - The target service account must have the necessary BigQuery permissions.
+
+## Functionality
+
+1. **Set Up Impersonated Credentials**:
+   - **Import Necessary Libraries**: Imports modules for authentication and BigQuery operations.
+   - **Define Scopes**: Sets `target_scopes` to `['https://www.googleapis.com/auth/cloud-platform']`.
+   - **Obtain Default Credentials**: Calls `google.auth.default()` to get `source_credentials` and `project_id`.
+   - **Create Impersonated Credentials**: Uses `google.auth.impersonated_credentials.Credentials` with `source_credentials`, `target_principal` set to `IMPERSONATION_CHAIN`, and `target_scopes`.
+
+2. **Execute Deduplication**:
+   - **Import Dedup Module**: Imports `dedup` from the `etlPackage`.
+   - **Call Dedup Function**: Executes `dedup.dedup()` with the provided parameters and `credentials=tcreds`.
+     - **Parameters Passed**: Includes `work_table`, `job_id`, `label_key`, `label_value`, `staging_table`, `dedup_key_id`, `where_clause_field`, `gcp_project`, `json_config`, and `credentials`.
+
+3. **Integrate with Airflow DAG**:
+   - **Create Operator**: Uses `PythonVirtualenvOperator` to create a task named `'dedup_task_' + str(table_name)`.
+   - **Configure Operator**:
+     - **Python Callable**: Sets to `venv_dedup_task`.
+     - **Python Version**: Specifies `'3.8'`.
+     - **Requirements**: Includes necessary frameworks via `FRAMEWORKS_VERSION`.
+     - **System Site Packages**: Sets `system_site_packages=True` to include system packages.
+     - **Operational Arguments**: Passes `op_kwargs` with all required parameters, including dynamic values from Airflow's XCom and environment variables.
+   - **Add to DAG**: Attaches the operator to the Airflow DAG for execution.
+
+4. **Error Handling**:
+   - **Assumption of Success**: The function assumes successful execution; any exceptions will be managed by Airflow's task failure mechanisms.
+   - **No Explicit Error Handling**: Does not include try-except blocks within the function.
+
+5. **Edge Cases**:
+   - **Invalid Table or Parameters**: If the specified table does not exist or parameters are invalid, the deduplication function will fail.
+   - **Authentication Issues**: If impersonated credentials cannot be obtained due to incorrect permissions or invalid `IMPERSONATION_CHAIN`, the function will fail when attempting to execute the deduplication.
+   - **Empty or Null Data**: If the table is empty or the deduplication keys do not exist in the data, the function may either perform no action or log a warning, depending on the implementation of the `dedup` function.
+
+---
+
+**Note**: This function is essential for maintaining data integrity within data pipelines by removing duplicate records from BigQuery tables. By integrating with Airflow and utilizing impersonated credentials, it ensures secure and efficient data processing within the Google Cloud environment.
+
+# Deduplication Target Task Function
+
+## Overview
+
+The `venv_dedup_task` function performs deduplication on a specified BigQuery table within an Airflow DAG. It uses impersonated credentials for secure access to Google Cloud resources and integrates with Airflow using the `PythonVirtualenvOperator`.
+
+## Purpose
+
+- **Data Deduplication**: Removes duplicate records from a BigQuery table based on specified columns.
+- **Automated Pipeline Integration**: Incorporates deduplication as a step in an Airflow data pipeline.
+- **Secure Authentication**: Utilizes impersonated credentials for secure and authorized access to Google Cloud services.
+
+## Parameters
+
+- **work_table** *(str)*: The BigQuery table where deduplication will be performed.
+  - **Optional**: No
+- **job_id** *(str)*: A unique identifier for the deduplication job.
+  - **Optional**: No
+- **label_key** *(str)*: A key used for labeling the BigQuery job.
+  - **Optional**: No
+- **label_value** *(str)*: A value associated with the label key for job tracking.
+  - **Optional**: No
+- **staging_table** *(str)*: The staging table used during the deduplication process.
+  - **Optional**: No
+- **dedup_column** *(str or list)*: The column(s) used to identify duplicates.
+  - **Optional**: No
+- **partition_column** *(str)*: The column used for partitioning data during deduplication.
+  - **Optional**: No
+- **order_by** *(str)*: The column(s) used to order data when removing duplicates.
+  - **Optional**: No
+- **gcp_project** *(str)*: The Google Cloud project ID.
+  - **Optional**: No
+- **json_config** *(dict)*: JSON configuration for auditing or additional settings.
+  - **Optional**: Yes
+  - **Default Value**: None
+- **airflow_conn_id** *(str)*: Airflow connection ID for credentials.
+  - **Optional**: Yes
+  - **Default Value**: `''`
+- **IMPERSONATION_CHAIN** *(str)*: The service account email used for impersonation.
+  - **Optional**: No
+
+### Internal Variables
+
+- **target_scopes** *(list)*: The OAuth scopes required for impersonation.
+- **source_credentials** *(Credentials)*: The source credentials obtained from the environment.
+- **tcreds** *(Credentials)*: The impersonated credentials used for authentication.
+
+## Returns
+
+- **None**: The function does not return a value; it performs deduplication on the specified table.
+- **Side Effects**: Modifies the BigQuery table by removing duplicate records.
+
+## Authentication
+
+- **Services Used**:
+  - **Google Cloud BigQuery**: For executing SQL queries and data manipulation.
+  - **Google Authentication Library**: For handling credentials and impersonation.
+- **Authentication Methods**:
+  - **Impersonated Credentials**: Uses `google.auth.impersonated_credentials.Credentials` to impersonate the target service account specified by `IMPERSONATION_CHAIN`.
+- **Permissions Required**:
+  - The source service account must have `roles/iam.serviceAccountTokenCreator` role on the target service account.
+  - The target service account must have permissions to perform BigQuery operations.
+
+## Functionality
+
+1. **Set Up Impersonated Credentials**:
+   - **Import Necessary Libraries**: Imports modules for authentication and BigQuery operations.
+   - **Define Scopes**: Sets `target_scopes` with the necessary OAuth scope.
+   - **Obtain Default Credentials**: Calls `google.auth.default()` to get `source_credentials` and `project_id`.
+   - **Create Impersonated Credentials**: Uses `google.auth.impersonated_credentials.Credentials` with:
+     - `source_credentials`
+     - `target_principal` set to `IMPERSONATION_CHAIN`
+     - `target_scopes`
+
+2. **Execute Deduplication Process**:
+   - **Import Deduplication Module**: Imports the `dedup` function from the `dedup_target` module in `etlPackage`.
+   - **Call Dedup Function**: Executes `dedup_target.dedup()` with the provided parameters and impersonated credentials (`credentials=tcreds`).
+     - **Parameters Passed**: Includes `work_table`, `job_id`, `label_key`, `label_value`, `staging_table`, `dedup_column`, `partition_column`, `order_by`, `gcp_project`, `json_config`, and `credentials`.
+
+3. **Integrate with Airflow DAG**:
+   - **Create Airflow Task**: Uses `PythonVirtualenvOperator` to create a task named `'dedup_target_task_' + str(table_name)`.
+   - **Configure Operator**:
+     - **python_callable**: Sets to `venv_dedup_task`.
+     - **python_version**: Specifies `'3.8'`.
+     - **requirements**: Includes necessary frameworks via `FRAMEWORKS_VERSION`.
+     - **system_site_packages**: Sets `system_site_packages=True` to include system packages.
+     - **op_kwargs**: Passes all required parameters, including dynamic values from Airflow's XCom and environment variables.
+   - **Add to DAG**: Attaches the operator to the Airflow DAG (`dag=dag`) for execution.
+
+## Notes
+
+- **Error Handling**: The function assumes successful execution; any exceptions will be managed by Airflow's task failure mechanisms.
+- **Edge Cases**:
+  - **Invalid Table or Parameters**: If the specified table does not exist or parameters are invalid, the deduplication function will fail.
+  - **Authentication Issues**: If impersonated credentials cannot be obtained due to incorrect permissions or an invalid `IMPERSONATION_CHAIN`, the function will fail when attempting to execute the deduplication.
+  - **Empty or Null Data**: If the table is empty or the deduplication columns do not exist in the data, the function may either perform no action or log a warning, depending on the implementation of the `dedup_target.dedup` function.
+
+---
+
+**Note**: This function is essential for maintaining data integrity within data pipelines by removing duplicate records from BigQuery tables. By integrating with Airflow and utilizing impersonated credentials, it ensures secure and efficient data processing within the Google Cloud environment.
+
+# Deduplication Target Merge Task Function
+
+## Overview
+
+The `venv_dedup_task` function performs deduplication on a specified BigQuery table within an Airflow DAG. It merges data by removing duplicate records based on specified columns. The function utilizes impersonated credentials for secure access to Google Cloud resources and integrates with Airflow using the `PythonVirtualenvOperator`.
+
+## Purpose
+
+- **Data Deduplication**: Removes duplicate records from a BigQuery table by merging data based on specified keys.
+- **Automated Pipeline Integration**: Incorporates deduplication as a step in an Airflow data pipeline.
+- **Secure Authentication**: Uses impersonated credentials for secure and authorized access to Google Cloud services.
+
+## Parameters
+
+- **work_table** *(str)*: The BigQuery table where deduplication will be performed.
+  - **Optional**: No
+- **job_id** *(str)*: A unique identifier for the deduplication job.
+  - **Optional**: No
+- **label_key** *(str)*: A key used for labeling the BigQuery job.
+  - **Optional**: No
+- **label_value** *(str)*: A value associated with the label key for job tracking.
+  - **Optional**: No
+- **staging_table** *(str)*: The staging table used during the deduplication process.
+  - **Optional**: No
+- **dedup_column** *(str or list)*: The column(s) used to identify duplicates.
+  - **Optional**: No
+- **partition_column** *(str)*: The column used for partitioning data during deduplication.
+  - **Optional**: Yes
+  - **Default Value**: Empty string (`""`) if not provided.
+- **order_by** *(str)*: The column(s) used to order data when removing duplicates.
+  - **Optional**: Yes
+  - **Default Value**: Empty string (`""`) if not provided.
+- **gcp_project** *(str)*: The Google Cloud project ID.
+  - **Optional**: No
+- **json_config** *(dict)*: JSON configuration for auditing or additional settings.
+  - **Optional**: Yes
+  - **Default Value**: None
+- **airflow_conn_id** *(str)*: Airflow connection ID for credentials.
+  - **Optional**: Yes
+  - **Default Value**: Empty string (`''`)
+- **IMPERSONATION_CHAIN** *(str)*: The service account email used for impersonation.
+  - **Optional**: No
+
+### Internal Variables
+
+- **target_scopes** *(list)*: The OAuth scopes required for impersonation.
+- **source_credentials** *(Credentials)*: The source credentials obtained from the environment.
+- **tcreds** *(Credentials)*: The impersonated credentials used for authentication.
+
+## Returns
+
+- **None**: The function does not return a value; it performs deduplication on the specified table.
+- **Side Effects**: Modifies the BigQuery table by removing duplicate records.
+
+## Authentication
+
+- **Services Used**:
+  - **Google Cloud BigQuery**: For executing SQL queries and data manipulation.
+  - **Google Authentication Library**: For handling credentials and impersonation.
+- **Authentication Methods**:
+  - **Impersonated Credentials**: Uses `google.auth.impersonated_credentials.Credentials` to impersonate the target service account specified by `IMPERSONATION_CHAIN`.
+- **Permissions Required**:
+  - The source service account must have `roles/iam.serviceAccountTokenCreator` role on the target service account.
+  - The target service account must have permissions to perform BigQuery operations.
+
+## Functionality
+
+1. **Step-by-Step Explanation**:
+
+   - **Import Necessary Libraries**: The function imports required modules such as `dedup_target_merge` from `etlPackage` and authentication libraries from `google.auth`.
+   - **Set Up Impersonated Credentials**:
+     - Defines `target_scopes` with the necessary OAuth scopes.
+     - Obtains `source_credentials` and `project_id` using `google.auth.default()`.
+     - Creates impersonated credentials `tcreds` by impersonating the service account specified by `IMPERSONATION_CHAIN`.
+   - **Execute Deduplication Process**:
+     - Calls `dedup_target_merge.dedup()` with the provided parameters and the impersonated credentials (`credentials=tcreds`).
+     - The deduplication function performs merging of data by removing duplicates based on `dedup_column`, partitioning by `partition_column`, and ordering by `order_by`.
+   - **Integrate with Airflow DAG**:
+     - Creates a `PythonVirtualenvOperator` named `'dedup_target_merge_task_' + str(table_name)`.
+     - Configures the operator with the appropriate `python_callable`, `python_version`, and `requirements`.
+     - Passes necessary parameters via `op_kwargs`, including dynamic values from Airflow's XCom and environment variables.
+     - Adds the operator to the DAG for execution.
+
+2. **Error Handling**:
+
+   - **Assumption of Success**: The function assumes successful execution; any exceptions are managed by Airflow's task failure mechanisms.
+   - **No Explicit Error Handling**: The function does not include try-except blocks; errors during execution will cause the task to fail, which can be caught and handled by Airflow.
+
+3. **Edge Cases**:
+
+   - **Missing Parameters**: If optional parameters like `partition_column` or `order_by` are not provided, they default to empty strings.
+   - **Invalid Credentials**: If impersonated credentials cannot be obtained due to incorrect permissions or invalid `IMPERSONATION_CHAIN`, the function will fail when attempting to execute deduplication.
+   - **Invalid Table or Columns**: If the specified `work_table` or `staging_table` does not exist, or if the columns specified in `dedup_column`, `partition_column`, or `order_by` are invalid, the deduplication process will fail.
+
+---
+
+**Note**: This function is essential for maintaining data integrity within data pipelines by removing duplicate records from BigQuery tables through a merge operation. By integrating with Airflow and utilizing impersonated credentials, it ensures secure and efficient data processing within the Google Cloud environment.
+
+# Write Files to Archive Task
+
+## Overview
+
+This code snippet defines an Airflow task that moves files from a source Google Cloud Storage (GCS) bucket to an archive GCS bucket. It handles both compressed and uncompressed files by dynamically creating a `GoogleCloudStorageToGoogleCloudStorageOperator` based on the file compression state.
+
+## Purpose
+
+- **Archive Processed Files**: Ensures that processed files are moved to an archive location for long-term storage or compliance purposes.
+- **Handle File Compression**: Differentiates between compressed and uncompressed files to correctly specify source objects.
+- **Dynamic Task Creation**: Integrates seamlessly into an Airflow DAG by dynamically creating tasks based on processing modules.
+
+## Parameters
+
+- **processing_modules** *(list)*: A list of processing module names to determine if the task should be executed.
+  - **Optional**: No
+- **is_file_compressed** *(bool)*: Indicates whether the files to be archived are compressed.
+  - **Optional**: No
+- **table_name** *(str)*: The name of the table or dataset, used to construct unique task IDs and paths.
+  - **Optional**: No
+- **parameter** *(dict)*: Configuration parameters, including bucket names and paths.
+  - **Optional**: No
+- **IMPERSONATION_CHAIN** *(str)*: Service account email used for impersonation in Google Cloud.
+  - **Optional**: No
+
+### Internal Variables
+
+- **hash_id** *(str)*: Unique identifier retrieved from Airflow's XCom for constructing file paths.
+- **source_bucket** *(str)*: Source GCS bucket name where files are currently stored.
+- **source_object** *(str)*: Path pattern of the source objects in the GCS bucket.
+- **destination_bucket** *(str)*: Destination GCS bucket name where files will be archived.
+- **destination_object** *(str)*: Path in the destination bucket for storing archived files.
+- **task_id** *(str)*: Unique identifier for the Airflow task.
+
+## Returns
+
+- **None**: This code sets up an Airflow task within the DAG; it does not return a value.
+- **Side Effects**: Moves or copies files from the source GCS bucket to the archive bucket when the task is executed.
+
+## Authentication
+
+- **Services Used**:
+  - **Google Cloud Storage**: For file operations between buckets.
+  - **Apache Airflow**: To manage and execute tasks within a DAG.
+- **Authentication Methods**:
+  - **Impersonation**: Uses the `impersonation_chain` parameter in the operator to impersonate a service account.
+- **Permissions Required**:
+  - The service account specified in `IMPERSONATION_CHAIN` must have read access to the source bucket and write access to the destination bucket.
+
+## Functionality
+
+1. **Check Processing Modules**:
+   - Verifies if `'write_files2archive'` is present in the `processing_modules` list.
+   - Proceeds with task creation only if the module is included.
+
+2. **Determine File Compression State**:
+   - Checks the `is_file_compressed` flag to decide how to construct the `source_object`.
+   - **Compressed Files**:
+     - Retrieves a `hash_id` from Airflow's XCom using `task_instance.xcom_pull`.
+     - Constructs `source_object` using the `hash_id` and a predefined path.
+   - **Uncompressed Files**:
+     - Constructs `source_object` by pulling a UUID from Airflow's XCom.
+     - Appends a wildcard character to include all relevant files.
+
+3. **Set Up the Operator**:
+   - **`GoogleCloudStorageToGoogleCloudStorageOperator`**:
+     - **task_id**: Generates a unique task ID using `table_name`.
+     - **source_bucket**: Obtained from `parameter['move_files_dest_bucket']`, formatted with the environment variable.
+     - **source_object**: Defined based on the compression state and includes necessary wildcards.
+     - **destination_bucket**: Modifies the source bucket name to point to the archive bucket by replacing a substring.
+     - **destination_object**: Constructs a destination path using `table_name` and the current datetime.
+     - **move_object**: Set to `True` to move files instead of copying.
+     - **gcp_conn_id**: Uses the default Google Cloud connection (`'google_cloud_default'`).
+     - **impersonation_chain**: Specifies the service account for impersonation.
+
+4. **Dynamic Task Creation**:
+   - Uses `globals()` to dynamically assign the operator to a variable, integrating it into the Airflow DAG.
+
+5. **Error Handling**:
+   - Relies on Airflow's built-in error handling.
+   - Assumes all required parameters and environment variables are correctly set; otherwise, the task will fail at runtime.
+
+6. **Edge Cases**:
+   - **Missing XCom Values**: If the required `hash_id` or UUID is not available in XCom, the task may fail.
+   - **Incorrect Permissions**: Lack of necessary permissions for the service account will cause authentication failures.
+   - **Invalid Bucket Names**: Nonexistent or incorrectly named buckets will result in runtime errors.
+
+---
+
+**Note**: This task is essential for workflows that require archiving of processed data files. By handling both compressed and uncompressed files and using service account impersonation, it ensures secure and efficient file management within the Google Cloud environment.
+
+# Write to GCS Source Archive Task
+
+## Overview
+
+The `venv_write2gcs_source_archive_task` function exports data from a BigQuery temporary table to a Google Cloud Storage (GCS) archive bucket. It uses impersonated credentials for secure access and integrates with Airflow using the `PythonVirtualenvOperator`.
+
+## Purpose
+
+- **Data Archiving**: Exports data from a BigQuery temporary table to a GCS archive bucket for long-term storage or compliance purposes.
+- **Secure Authentication**: Utilizes impersonated credentials to securely interact with Google Cloud services without exposing sensitive credentials.
+- **Airflow Integration**: Seamlessly incorporates into Airflow pipelines, allowing for automated and scheduled execution.
+
+## Parameters
+
+- **temp_table** *(str)*: The BigQuery temporary table from which data will be exported.
+  - **Optional**: No
+- **arch_bucket** *(str)*: The GCS bucket URL where the data will be archived.
+  - **Optional**: No
+- **projectname** *(str)*: The name of the Google Cloud project.
+  - **Optional**: No
+- **file_name** *(str)*: The name of the file to be created in the archive bucket.
+  - **Optional**: No
+- **gcp_project** *(str)*: The Google Cloud project ID where BigQuery resources reside.
+  - **Optional**: No
+- **airflow_conn_id** *(str)*: The Airflow connection ID for retrieving credentials.
+  - **Optional**: Yes
+  - **Default Value**: `''`
+- **IMPERSONATION_CHAIN** *(str)*: The service account email used for impersonation.
+  - **Optional**: No
+
+### Internal Variables
+
+- **target_scopes** *(list)*: OAuth scopes required for impersonation (`['https://www.googleapis.com/auth/cloud-platform']`).
+- **source_credentials** *(Credentials)*: Default credentials obtained from the environment.
+- **tcreds** *(Credentials)*: Impersonated credentials used for authentication.
+
+## Returns
+
+- **None**: The function does not return any value; it performs the data export operation.
+- **Side Effects**: Exports data from BigQuery to a GCS bucket, creating a file in the specified archive location.
+
+## Authentication
+
+- **Services Used**:
+  - **Google Cloud BigQuery**: For reading data from the temporary table.
+  - **Google Cloud Storage**: For writing data to the archive bucket.
+- **Authentication Methods**:
+  - **Impersonated Credentials**: Uses `google.auth.impersonated_credentials.Credentials` to impersonate the target service account specified by `IMPERSONATION_CHAIN`.
+- **Permissions Required**:
+  - The source service account must have the `roles/iam.serviceAccountTokenCreator` role on the target service account.
+  - The target service account must have permissions to read from BigQuery and write to GCS.
+
+## Functionality
+
+1. **Set Up Impersonated Credentials**:
+   - **Import Necessary Libraries**: Imports modules for BigQuery and GCS operations, and for authentication.
+   - **Define Scopes**: Sets `target_scopes` to include the necessary OAuth scopes.
+   - **Obtain Default Credentials**: Retrieves `source_credentials` and `project_id` using `google.auth.default()`.
+   - **Create Impersonated Credentials**: Constructs `tcreds` by impersonating the service account specified by `IMPERSONATION_CHAIN`.
+
+2. **Execute Data Export**:
+   - **Import Export Function**: Imports `writetogcs_archive` from `etlPackage.write2gcs_archive`.
+   - **Call Export Function**: Executes `write2gcs_archive.writetogcs_archive()` with the provided parameters and `credentials=tcreds`.
+
+3. **Integrate with Airflow DAG**:
+   - **Create Operator**: Uses `PythonVirtualenvOperator` to create a task named `'write2gcs_source_archive_task_' + str(table_name)`.
+   - **Configure Operator**:
+     - **python_callable**: Sets to `venv_write2gcs_source_archive_task`.
+     - **python_version**: Specifies `'3.8'`.
+     - **requirements**: Includes necessary Python packages specified by `FRAMEWORKS_VERSION`.
+     - **system_site_packages**: Sets to `True` to include system site packages.
+     - **op_kwargs**: Passes operational arguments, including dynamic values retrieved from Airflow's XCom and environment variables.
+   - **Add to DAG**: Attaches the operator to the Airflow DAG for execution.
+
+---
+
+**Note**: This function is crucial for archiving data from BigQuery to GCS, ensuring data is securely and efficiently exported for long-term storage or compliance. By leveraging impersonated credentials and integrating with Airflow, it adheres to best practices for security and automation in data engineering workflows.
+
+# YAML Validation Check Function
+
+## Overview
+
+The `venv_yaml_validation_check` function performs a YAML validation check on a temporary BigQuery table within an Airflow DAG. It utilizes impersonated credentials for secure access to Google Cloud resources and integrates with Airflow using the `PythonVirtualenvOperator`.
+
+## Purpose
+
+- **Data Validation**: Ensures that the data in the temporary table conforms to the specifications defined in the YAML configuration.
+- **Automated Pipeline Integration**: Incorporates YAML validation as a step in the data processing pipeline.
+- **Secure Authentication**: Uses impersonated credentials for secure and authorized access to Google Cloud services.
+
+## Parameters
+
+- **temp_table** *(str)*: The BigQuery temporary table to be validated.
+  - **Optional**: No
+- **job_id** *(str)*: A unique identifier for the validation job.
+  - **Optional**: No
+- **label_key** *(str)*: A key used for labeling the BigQuery job.
+  - **Optional**: No
+- **label_value** *(str)*: A value associated with the label key for job tracking.
+  - **Optional**: No
+- **features** *(dict)*: The YAML configuration parameters used for validation.
+  - **Optional**: No
+- **gcp_project** *(str)*: The Google Cloud project ID where BigQuery resources reside.
+  - **Optional**: No
+- **json_config** *(dict)*: JSON configuration for auditing or additional settings.
+  - **Optional**: Yes
+  - **Default Value**: None
+- **airflow_conn_id** *(str)*: Airflow connection ID for credentials.
+  - **Optional**: Yes
+  - **Default Value**: `''`
+- **IMPERSONATION_CHAIN** *(str)*: The service account email used for impersonation.
+  - **Optional**: No
+
+### Internal Variables
+
+- **target_scopes** *(list)*: OAuth scopes required for impersonation (`['https://www.googleapis.com/auth/cloud-platform']`).
+- **source_credentials**: Default credentials obtained from the environment.
+- **tcreds**: Impersonated credentials used for authentication.
+
+## Returns
+
+- **Return Type**: None. The function performs the validation and does not return a value.
+- **Side Effects**: May raise exceptions if the validation fails.
+
+## Authentication
+
+- **Services Used**:
+  - **Google Cloud BigQuery**: For data access and validation operations.
+  - **Google Authentication Library**: For handling credentials and impersonation.
+- **Authentication Methods**:
+  - **Impersonated Credentials**: Utilizes `google.auth.impersonated_credentials.Credentials` to impersonate the target service account specified by `IMPERSONATION_CHAIN`.
+- **Permissions Required**:
+  - The source service account must have the `roles/iam.serviceAccountTokenCreator` role on the target service account.
+  - The target service account must have permissions to access BigQuery resources.
+
+## Functionality
+
+1. **Step-by-Step Explanation**:
+   - **Import Necessary Modules**:
+     - Imports `yaml_validation` from `etlQAPackage`.
+     - Imports authentication modules from `google.auth`.
+   - **Set Up Impersonated Credentials**:
+     - Defines `target_scopes` for OAuth permissions.
+     - Obtains `source_credentials` and `project_id` using `google.auth.default()`.
+     - Creates impersonated credentials (`tcreds`) targeting `IMPERSONATION_CHAIN` with `target_scopes`.
+   - **Perform YAML Validation**:
+     - Calls `yaml_validation.validate` with the provided parameters and `credentials=tcreds`.
+     - The validation function checks the data in `temp_table` against the specifications defined in `features`.
+   - **Integration with Airflow DAG**:
+     - Creates a `PythonVirtualenvOperator` named `'yaml_validation_check_' + str(table_name)`.
+     - Configures the operator with the necessary parameters and adds it to the DAG.
+
+2. **Error Handling**:
+   - If the validation fails, the `yaml_validation.validate` function is expected to raise an exception.
+   - Airflow will handle task failures based on its configuration.
+
+3. **Edge Cases**:
+   - **Invalid Credentials**: If impersonated credentials cannot be obtained, authentication errors will occur.
+   - **Invalid Parameters**: If required parameters are missing or invalid, the function may fail.
+   - **Validation Errors**: Any discrepancies between the data and the YAML specifications will cause the validation to fail.
+
+---
+
+**Note**: This function is essential for ensuring data quality by validating that the data conforms to predefined YAML configurations. By integrating with Airflow and using impersonated credentials, it ensures secure and automated data validation within the Google Cloud environment.
+
 
 
